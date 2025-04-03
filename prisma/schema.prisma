@@ -1,0 +1,304 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  COMPANY
+  SCHOOL
+  ADMIN
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          UserRole
+  profileImage  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations based on role
+  student       Student?
+  company       Company?
+  school        School?
+  
+  // Common relations
+  sentMessages     Message[]  @relation("SentMessages")
+  receivedMessages Message[]  @relation("ReceivedMessages")
+}
+
+model Student {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  school        String?
+  major         String?
+  graduationYear Int?
+  bio           String?   @db.Text
+  resumeUrl     String?
+  
+  // Skills and profile completion
+  skills        StudentSkill[]
+  profileCompletion Int     @default(0)
+  
+  // Internship applications
+  applications  Application[]
+  
+  // Learning and skill development
+  learningHours Float     @default(0)
+  assessments   Assessment[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Company {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  industry      String?
+  size          String?
+  location      String?
+  website       String?
+  description   String?   @db.Text
+  
+  // Internship postings
+  internships   Internship[]
+  
+  // School partnerships
+  schoolPartnerships SchoolPartnership[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model School {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type          String?
+  location      String?
+  website       String?
+  description   String?   @db.Text
+  
+  // Company partnerships
+  companyPartnerships SchoolPartnership[]
+  
+  // Academic programs
+  programs      Program[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Skill {
+  id            String    @id @default(cuid())
+  name          String    @unique
+  category      String?
+  
+  // Relations
+  studentSkills StudentSkill[]
+  internshipSkills InternshipSkill[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model StudentSkill {
+  id            String    @id @default(cuid())
+  studentId     String
+  student       Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  skillId       String
+  skill         Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  proficiency   Int       @default(0) // 0-100 scale
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([studentId, skillId])
+}
+
+model Internship {
+  id            String    @id @default(cuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  title         String
+  description   String    @db.Text
+  location      String
+  isRemote      Boolean   @default(false)
+  isHybrid      Boolean   @default(false)
+  startDate     DateTime?
+  endDate       DateTime?
+  deadline      DateTime?
+  isPaid        Boolean   @default(false)
+  compensation  String?
+  
+  // Required skills
+  requiredSkills InternshipSkill[]
+  
+  // Applications
+  applications  Application[]
+  
+  status        String    @default("ACTIVE") // ACTIVE, FILLED, CLOSED, DRAFT
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model InternshipSkill {
+  id            String    @id @default(cuid())
+  internshipId  String
+  internship    Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  skillId       String
+  skill         Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  importance    Int       @default(1) // 1-5 scale
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([internshipId, skillId])
+}
+
+model Application {
+  id            String    @id @default(cuid())
+  studentId     String
+  student       Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  internshipId  String
+  internship    Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  
+  status        String    @default("APPLIED") // APPLIED, SCREENING, INTERVIEW, ACCEPTED, REJECTED
+  coverLetter   String?   @db.Text
+  resumeUrl     String?
+  
+  // Interview scheduling
+  interviews    Interview[]
+  
+  // Reviews (after completion)
+  review        Review?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([studentId, internshipId])
+}
+
+model Interview {
+  id            String    @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  scheduledAt   DateTime
+  duration      Int       // in minutes
+  location      String?
+  isVirtual     Boolean   @default(false)
+  meetingLink   String?
+  notes         String?   @db.Text
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Review {
+  id            String    @id @default(cuid())
+  applicationId String    @unique
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  rating        Int       // 1-5 scale
+  feedback      String    @db.Text
+  isAnonymous   Boolean   @default(false)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model SchoolPartnership {
+  id            String    @id @default(cuid())
+  schoolId      String
+  school        School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  status        String    @default("ACTIVE") // ACTIVE, INACTIVE, PENDING
+  startDate     DateTime  @default(now())
+  endDate       DateTime?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([schoolId, companyId])
+}
+
+model Program {
+  id            String    @id @default(cuid())
+  schoolId      String
+  school        School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  name          String
+  description   String?   @db.Text
+  credits       Int?
+  
+  // Academic integration
+  isInternshipEligible Boolean @default(false)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Assessment {
+  id            String    @id @default(cuid())
+  studentId     String
+  student       Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  title         String
+  score         Int?      // Percentage score
+  completedAt   DateTime?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Message {
+  id            String    @id @default(cuid())
+  senderId      String
+  sender        User      @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId    String
+  receiver      User      @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  content       String    @db.Text
+  isRead        Boolean   @default(false)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Event {
+  id            String    @id @default(cuid())
+  title         String
+  description   String    @db.Text
+  startDate     DateTime
+  endDate       DateTime
+  location      String?
+  isVirtual     Boolean   @default(false)
+  meetingLink   String?
+  
+  // Event can be created by any user type
+  creatorId     String?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
