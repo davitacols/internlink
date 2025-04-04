@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 })
     }
 
-    const result = await createUser(email, password, name, role as UserRole)
+    const result = await createUser(email, password, name, role as "STUDENT" | "COMPANY" | "SCHOOL")
 
     if (!result.success) {
       return NextResponse.json({ error: result.error || "Registration failed" }, { status: 400 })
